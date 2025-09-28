@@ -7,6 +7,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      NODE_ENV: production
     
     steps:
     - name: Checkout code
@@ -24,7 +28,8 @@ jobs:
     - name: Set up Prisma
       run: |
         npx prisma generate
-        npx prisma db push --skip-generate
+        # Skip db push for MongoDB (it's not needed for MongoDB)
+        # npx prisma db push --skip-generate
       
     - name: Build project
       run: npm run build
