@@ -6,11 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-export default async function Home() {
-  const session = await getServerAuthSession();
-  
-  // Fetch featured articles (most recent 6 published articles)
-  const featuredArticles = await prisma.article.findMany({
+// Opt out of static generation for this page
+export const dynamic = 'force-dynamic';
+
+// Revalidate the page every 60 seconds
+export const revalidate = 60;
+
+async function getFeaturedArticles() {
+  try {
+    return await prisma.article.findMany({
     where: { 
       status: 'PUBLISHED'
     },
@@ -43,7 +47,27 @@ export default async function Home() {
       updatedAt: 'desc'
     },
     take: 6,
-  });
+    });
+  } catch (error) {
+    console.error('Error fetching featured articles:', error);
+    return [];
+  }
+}
+
+export default async function Home() {
+  let session = null;
+  let featuredArticles = [];
+  
+  try {
+    // Fetch session and articles in parallel
+    [session, featuredArticles] = await Promise.all([
+      getServerAuthSession(),
+      getFeaturedArticles()
+    ]);
+  } catch (error) {
+    console.error('Error in Home page:', error);
+    // Continue rendering with empty data
+  }
 
   return (
     <>

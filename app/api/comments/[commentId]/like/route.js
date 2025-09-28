@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { auth } from '@/auth';
 import prisma from '@/lib/prisma';
 import { getClientIp } from 'request-ip';
 import { RateLimiter } from '@/lib/rate-limiter';
@@ -14,12 +13,12 @@ const likeLimiter = new RateLimiter({
 export async function POST(request, { params }) {
   try {
     const { commentId } = params;
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     
-    if (!session) {
+    if (!session?.user) {
       return new NextResponse(
         JSON.stringify({ error: 'You must be logged in to like comments' }), 
-        { status: 401 }
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -108,12 +107,12 @@ export async function POST(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { commentId } = params;
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     
-    if (!session) {
+    if (!session?.user) {
       return new NextResponse(
         JSON.stringify({ error: 'You must be logged in to unlike comments' }), 
-        { status: 401 }
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
