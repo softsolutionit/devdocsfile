@@ -22,9 +22,12 @@ jobs:
       run: npm ci
       
     - name: Set up Prisma
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
       run: |
         npx prisma generate
-        npx prisma db push --skip-generate
+        # Skip db push for MongoDB (it's not needed for MongoDB)
+        # npx prisma db push --skip-generate
       
     - name: Build project
       run: npm run build
