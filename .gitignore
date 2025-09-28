@@ -43,6 +43,6 @@ next-env.d.ts
 
 /app/generated/prisma
 
-/prisma/schema.prisma
+
 #project files
 project.md
