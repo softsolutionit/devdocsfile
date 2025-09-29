@@ -26,6 +26,8 @@ jobs:
       run: |
         npm ci
         npm list @tailwindcss/postcss
+        npm install --save-dev eslint
+        npm install tw-animate-css --save-dev
       
     - name: Set up Prisma
       run: |
