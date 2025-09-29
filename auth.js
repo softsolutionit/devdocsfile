@@ -5,16 +5,17 @@ import GitHubProvider from 'next-auth/providers/github';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import prisma from './lib/prisma';
 
 // Prisma client with error handling
-let prisma;
+// let prisma;
 
-try {
-  prisma = new PrismaClient();
-} catch (error) {
-  console.error('Failed to initialize Prisma:', error);
-  // Fallback or exit if database connection fails
-}
+// try {
+//   prisma = new PrismaClient();
+// } catch (error) {
+//   console.error('Failed to initialize Prisma:', error);
+//   // Fallback or exit if database connection fails
+// }
 
 // Ensure NEXTAUTH_SECRET is set in production
 if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
@@ -80,6 +81,13 @@ export const authOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
     }),
     GitHubProvider({
       clientId: process.env.GITHUB_ID,
