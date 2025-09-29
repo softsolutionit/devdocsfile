@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 
 // Opt out of static generation for this page
 export const dynamic = 'force-dynamic';
@@ -226,7 +227,10 @@ export default async function Home() {
               className="p-6 border rounded-lg hover:bg-muted/50 transition-colors flex justify-between items-center"
             >
               <span className="font-medium">{tag.name}</span>
-              <span className="text-sm text-muted-foreground">{tag.count}</span>
+              <Badge className="text-xs font-medium bg-teal-300 text-teal-800  dark:bg-muted dark:text-muted-foreground">
+                {tag.count}
+              </Badge>
+              
             </Link>
           ))}
         </div>

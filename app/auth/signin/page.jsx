@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +14,7 @@ export default function SignInPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const router = useRouter();
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,10 +28,12 @@ export default function SignInPage() {
         password,
       });
 
+      console.log('SignIn result:', result);
+
       if (result.error) {
         setError(result.error);
       } else {
-        router.push('/dashboard');
+         window.location.href = '/dashboard';
       }
     } catch (error) {
       setError('An error occurred during sign in');
@@ -44,7 +45,9 @@ export default function SignInPage() {
   const handleOAuthSignIn = async (provider) => {
     setIsLoading(true);
     try {
-      await signIn(provider, { callbackUrl: `${window.location.origin}/dashboard` });
+      await signIn(provider, {
+        callbackUrl: `/dashboard`
+      });
     } catch (error) {
       setError('An error occurred during sign in');
       setIsLoading(false);

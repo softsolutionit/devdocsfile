@@ -23,7 +23,16 @@ export async function middleware(request) {
   }
 
   // Get the token
-  const token = await getToken({ req: request, secret });
+  const token = await getToken({
+    req: request, 
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production",
+    cookieName:
+      process.env.NODE_ENV === "production"
+        ? "__Secure-next-auth.session-token"
+        : "next-auth.session-token",
+   });
+
 
   // If no token and path is protected, redirect to signin
   if (!token && protectedPaths.some(path => 

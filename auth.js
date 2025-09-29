@@ -19,9 +19,9 @@ export const authOptions = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  // Trust host configuration
+  
   trustHost: true,
-  // Use secure cookies in production
+  
   useSecureCookies: process.env.NODE_ENV === 'production',
   
   providers: [
@@ -32,6 +32,7 @@ export const authOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
+        
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Please enter your email and password');
         }
@@ -45,7 +46,6 @@ export const authOptions = {
             throw new Error('Invalid email or password');
           }
 
-          // For OAuth users who don't have a password
           if (!user.password) {
             throw new Error('Please sign in with your social account');
           }
@@ -63,7 +63,6 @@ export const authOptions = {
             role: user.role,
           };
         } catch (error) {
-          console.error('Authorization error:', error);
           throw new Error('Authentication failed');
         }
       },
@@ -89,38 +88,29 @@ export const authOptions = {
     },
     
     async redirect({ url, baseUrl }) {
-      console.log('🔀 Redirect callback:', { url, baseUrl });
       
-      // If redirecting to relative path, use the production baseUrl
       if (url.startsWith('/')) {
-        const redirectUrl = `${baseUrl}${url}`;
-        console.log('🔀 Redirecting to:', redirectUrl);
-        return redirectUrl;
+        return `${baseUrl}${url}`;
       }
       
-      // If URL is from the same origin, allow it
-      else if (new URL(url).origin === baseUrl) {
-        console.log('🔀 Same origin redirect:', url);
+      if (url.startsWith(baseUrl)) {
         return url;
       }
       
-      // Default to dashboard
-      console.log('🔀 Default redirect to dashboard');
       return `${baseUrl}/dashboard`;
     },
     
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.sub; // Use token.sub instead of token.id
+        session.user.id = token.sub; 
         session.user.role = token.role;
       }
       return session;
     },
     
     async jwt({ token, user, account }) {
-      // Initial sign in
       if (user) {
-        token.role = user.role || 'user';
+        token.role = user.role || 'USER';
       }
       return token;
     },
@@ -139,20 +129,30 @@ export const authOptions = {
         domain: process.env.NODE_ENV === 'production' ? '.devdocsfile.com' : undefined,
       },
     },
+    authjs: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-authjs.session-token"
+          : "authjs.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
   
   secret: secret,
   
   events: {
     async createUser({ user }) {
-      // Assign default role to new users
       try {
         await prisma.user.update({
           where: { id: user.id },
           data: { role: 'USER' },
         });
       } catch (error) {
-        console.error('Error updating user role:', error);
       }
     },
   },
