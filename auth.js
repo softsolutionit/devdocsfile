@@ -89,11 +89,24 @@ export const authOptions = {
     },
     
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
-      if (url.startsWith('/')) return `${baseUrl}${url}`
-      // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) return url
-      return baseUrl
+      console.log('🔀 Redirect callback:', { url, baseUrl });
+      
+      // If redirecting to relative path, use the production baseUrl
+      if (url.startsWith('/')) {
+        const redirectUrl = `${baseUrl}${url}`;
+        console.log('🔀 Redirecting to:', redirectUrl);
+        return redirectUrl;
+      }
+      
+      // If URL is from the same origin, allow it
+      else if (new URL(url).origin === baseUrl) {
+        console.log('🔀 Same origin redirect:', url);
+        return url;
+      }
+      
+      // Default to dashboard
+      console.log('🔀 Default redirect to dashboard');
+      return `${baseUrl}/dashboard`;
     },
     
     async session({ session, token }) {

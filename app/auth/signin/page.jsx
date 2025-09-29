@@ -44,7 +44,7 @@ export default function SignInPage() {
   const handleOAuthSignIn = async (provider) => {
     setIsLoading(true);
     try {
-      await signIn(provider, { callbackUrl: '/dashboard' });
+      await signIn(provider, { callbackUrl: `${window.location.origin}/dashboard` });
     } catch (error) {
       setError('An error occurred during sign in');
       setIsLoading(false);
