@@ -3,19 +3,8 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
 import { PrismaAdapter } from '@auth/prisma-adapter';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import prisma from './lib/prisma';
-
-// Prisma client with error handling
-// let prisma;
-
-// try {
-//   prisma = new PrismaClient();
-// } catch (error) {
-//   console.error('Failed to initialize Prisma:', error);
-//   // Fallback or exit if database connection fails
-// }
 
 // Ensure NEXTAUTH_SECRET is set in production
 if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
@@ -25,11 +14,16 @@ if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
 const secret = process.env.NEXTAUTH_SECRET;
 
 export const authOptions = {
-  adapter: prisma ? PrismaAdapter(prisma) : undefined,
+  adapter: PrismaAdapter(prisma),
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  // Trust host configuration
+  trustHost: true,
+  // Use secure cookies in production
+  useSecureCookies: process.env.NODE_ENV === 'production',
+  
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -42,13 +36,9 @@ export const authOptions = {
           throw new Error('Please enter your email and password');
         }
 
-        if (!prisma) {
-          throw new Error('Database connection unavailable');
-        }
-
         try {
           const user = await prisma.user.findUnique({
-            where: { email: credentials.email },
+            where: { email: credentials.email.toLowerCase().trim() },
           });
 
           if (!user) {
@@ -81,54 +71,79 @@ export const authOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
-        },
-      },
     }),
     GitHubProvider({
       clientId: process.env.GITHUB_ID,
       clientSecret: process.env.GITHUB_SECRET,
     }),
   ],
+  
   pages: {
     signIn: '/auth/signin',
     error: '/auth/error',
   },
+  
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Allow all sign ins
       return true;
     },
+    
     async redirect({ url, baseUrl }) {
-      // Redirect to dashboard after successful sign in
-      if (url.startsWith(baseUrl)) {
-        return url;
-      } else if (url.startsWith('/')) {
-        return `${baseUrl}${url}`;
-      }
-      return baseUrl;
+      // Allows relative callback URLs
+      if (url.startsWith('/')) return `${baseUrl}${url}`
+      // Allows callback URLs on the same origin
+      else if (new URL(url).origin === baseUrl) return url
+      return baseUrl
     },
+    
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id;
+        session.user.id = token.sub; // Use token.sub instead of token.id
         session.user.role = token.role;
       }
       return session;
     },
+    
     async jwt({ token, user, account }) {
-      // Persist user id and role to token
+      // Initial sign in
       if (user) {
-        token.id = user.id;
         token.role = user.role || 'user';
       }
       return token;
     },
   },
+  
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' 
+        ? '__Secure-next-auth.session-token' 
+        : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        domain: process.env.NODE_ENV === 'production' ? '.devdocsfile.com' : undefined,
+      },
+    },
+  },
+  
   secret: secret,
+  
+  events: {
+    async createUser({ user }) {
+      // Assign default role to new users
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { role: 'USER' },
+        });
+      } catch (error) {
+        console.error('Error updating user role:', error);
+      }
+    },
+  },
+  
   debug: process.env.NODE_ENV === 'development',
 };
 
