@@ -6,50 +6,28 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+// Prisma client with error handling
+let prisma;
 
-// Generate a secure random secret if NEXTAUTH_SECRET is not set
-const secret = process.env.NEXTAUTH_SECRET || require('crypto').randomBytes(32).toString('hex');
+try {
+  prisma = new PrismaClient();
+} catch (error) {
+  console.error('Failed to initialize Prisma:', error);
+  // Fallback or exit if database connection fails
+}
+
+// Ensure NEXTAUTH_SECRET is set in production
+if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET is required in production');
+}
+
+const secret = process.env.NEXTAUTH_SECRET;
 
 export const authOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: prisma ? PrismaAdapter(prisma) : undefined,
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  jwt: {
-    secret: secret,
-    encryption: true,
-  },
-  pages: {
-    signIn: '/auth/signin',
-    error: '/auth/error',
-  },
-  events: {
-    async createUser(message) {
-      // You can add any post-registration logic here
-      console.log('User created:', message.user);
-    },
-  },
-  callbacks: {
-    async signIn({ user, account, profile, email, credentials }) {
-      return true;
-    },
-    async redirect({ url, baseUrl }) {
-      return url.startsWith(baseUrl) ? url : baseUrl;
-    },
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.sub;
-      }
-      return session;
-    },
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-      }
-      return token;
-    },
   },
   providers: [
     CredentialsProvider({
@@ -63,15 +41,40 @@ export const authOptions = {
           throw new Error('Please enter your email and password');
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
-
-        if (!user || !(await bcrypt.compare(credentials.password, user.password))) {
-          throw new Error('Invalid email or password');
+        if (!prisma) {
+          throw new Error('Database connection unavailable');
         }
 
-        return user;
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          });
+
+          if (!user) {
+            throw new Error('Invalid email or password');
+          }
+
+          // For OAuth users who don't have a password
+          if (!user.password) {
+            throw new Error('Please sign in with your social account');
+          }
+
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+
+          if (!isPasswordValid) {
+            throw new Error('Invalid email or password');
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          };
+        } catch (error) {
+          console.error('Authorization error:', error);
+          throw new Error('Authentication failed');
+        }
       },
     }),
     GoogleProvider({
@@ -83,12 +86,24 @@ export const authOptions = {
       clientSecret: process.env.GITHUB_SECRET,
     }),
   ],
-  // Session configuration is moved up
   pages: {
-    signIn: '/auth/signin', 
+    signIn: '/auth/signin',
     error: '/auth/error',
   },
   callbacks: {
+    async signIn({ user, account, profile }) {
+      // Allow all sign ins
+      return true;
+    },
+    async redirect({ url, baseUrl }) {
+      // Redirect to dashboard after successful sign in
+      if (url.startsWith(baseUrl)) {
+        return url;
+      } else if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      }
+      return baseUrl;
+    },
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id;
@@ -96,7 +111,8 @@ export const authOptions = {
       }
       return session;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      // Persist user id and role to token
       if (user) {
         token.id = user.id;
         token.role = user.role || 'user';
@@ -105,7 +121,7 @@ export const authOptions = {
     },
   },
   secret: secret,
+  debug: process.env.NODE_ENV === 'development',
 };
 
 export const { handlers, signIn, signOut, auth } = NextAuth(authOptions);
-
