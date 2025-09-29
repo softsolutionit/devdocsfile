@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-// Generate a secure random secret if NEXTAUTH_SECRET is not set
-const secret = process.env.NEXTAUTH_SECRET || require('crypto').randomBytes(32).toString('hex');
+// In production, require NEXTAUTH_SECRET to be set
+if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET is required in production');
+}
+
+const secret = process.env.NEXTAUTH_SECRET;
 
 const publicPaths = ['/auth/signin', '/auth/signup', '/auth/register', '/auth/error', '/', '/api/auth/**'];
 const protectedPaths = ['/dashboard/**', '/api/admin/**'];
@@ -18,47 +22,22 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  // Check if the path is protected
-  const isProtected = protectedPaths.some(path => 
+  // Get the token
+  const token = await getToken({ req: request, secret });
+
+  // If no token and path is protected, redirect to signin
+  if (!token && protectedPaths.some(path => 
     path === pathname || 
     (path.endsWith('**') && pathname.startsWith(path.slice(0, -3)))
-  );
-
-  if (isProtected) {
-    const token = await getToken({ 
-      req: request,
-      secret,
-      secureCookie: process.env.NODE_ENV === 'production'
-    });
-    
-    // Redirect to signin if not authenticated
-    if (!token) {
-      const signInUrl = new URL('/auth/signin', request.url);
-      signInUrl.searchParams.set('callbackUrl', pathname);
-      return NextResponse.redirect(signInUrl);
-    }
-
-    // Check for admin routes
-    if (pathname.startsWith('/api/admin') && token.role !== 'ADMIN') {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+  )) {
+    const url = new URL('/auth/signin', request.url);
+    url.searchParams.set('callbackUrl', encodeURI(request.url));
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
