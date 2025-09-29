@@ -30,8 +30,6 @@ jobs:
     - name: Set up Prisma
       run: |
         npx prisma generate
-        # Skip db push for MongoDB (it's not needed for MongoDB)
-        # npx prisma db push --skip-generate
       
     - name: Build project
       run: npm run build
@@ -49,14 +47,17 @@ jobs:
         key: ${{ secrets.VPS_SSH_KEY }}
         script: |
           cd /root/devdocsfile
+          # Load nvm to make node, npm, npx, pm2 available
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+          
           echo "Pulling latest changes..."
           git pull origin main
           echo "Installing dependencies..."
           npm ci --production
           echo "Generating Prisma client..."
           npx prisma generate
-          echo "Running database migrations..."
-          npx prisma migrate deploy
           echo "Building project..."
           npm run build
           echo "Restarting application..."

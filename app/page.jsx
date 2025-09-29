@@ -77,7 +77,7 @@ export default async function Home() {
           Welcome to <span className="text-primary">DevDocs</span>
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-          A community-driven platform for developers to share knowledge, tutorials, and insights.
+          A community-driven platform for _developers_ to share knowledge, tutorials, and insights.
         </p>
         <div className="flex justify-center gap-4">
           <Button asChild size="lg">
