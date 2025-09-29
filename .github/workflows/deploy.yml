@@ -49,13 +49,12 @@ jobs:
           cd /root/devdocsfile
           # Load nvm to make node, npm, npx, pm2 available
           export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           
           echo "Pulling latest changes..."
           git pull origin main
-          echo "Installing dependencies..."
-          npm ci --production
+          echo "Installing ALL dependencies (including dev)..."
+          npm ci --include=dev  # Changed from --production
           echo "Generating Prisma client..."
           npx prisma generate
           echo "Building project..."
