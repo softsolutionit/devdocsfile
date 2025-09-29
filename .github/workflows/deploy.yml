@@ -25,7 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         npm ci
-        npm install tailwindcss @tailwindcss/postcss postcss
+        npm list @tailwindcss/postcss
       
     - name: Set up Prisma
       run: |
@@ -53,7 +53,6 @@ jobs:
           git pull origin main
           echo "Installing dependencies..."
           npm ci --production
-          npm install tailwindcss @tailwindcss/postcss postcss
           echo "Generating Prisma client..."
           npx prisma generate
           echo "Running database migrations..."
