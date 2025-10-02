@@ -14,8 +14,12 @@ import { Icons } from '@/components/icons';
 import { toast } from 'sonner';
 
 const formSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email'),
+  name: z.string().min(3, 'Name must be at least 3 characters'),
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be at most 30 characters')
+    .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
+  email: z.email('Please enter a valid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
@@ -26,14 +30,57 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
+    watch,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
+      username: '',
       email: '',
+      password: '',
     },
+    mode: 'onChange',
   });
+
+  const username = watch('username', '');
+  
+  // Check username availability
+  const checkUsername = async (username) => {
+    if (!username || username.length < 3) return;
+    
+    try {
+      const response = await fetch(`/api/auth/check-username?username=${encodeURIComponent(username)}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to check username');
+      }
+      
+      return data.available;
+    } catch (error) {
+      console.error('Error checking username:', error);
+      return false;
+    }
+  };
+  
+  // Debounced username validation
+  const validateUsername = async (value) => {
+    if (!value) return 'Username is required';
+    if (value.length < 3) return 'Username must be at least 3 characters';
+    if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+      return 'Username can only contain letters, numbers, and underscores';
+    }
+    
+    const isAvailable = await checkUsername(value);
+    if (isAvailable === false) {
+      return 'This username is already taken';
+    }
+    
+    return true;
+  };
 
   const onSubmit = async (data) => {
     setIsLoading(true);
@@ -106,16 +153,46 @@ export default function RegisterPage() {
               )}
             </div>
             <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 sm:text-sm">devdocsfile.com/</span>
+                </div>
+                <Input
+                  id="username"
+                  className="pl-40"
+                  placeholder="username"
+                  type="text"
+                  autoCapitalize="none"
+                  autoComplete="username"
+                  autoCorrect="off"
+                  disabled={isLoading}
+                  {...register('username', {
+                    validate: validateUsername,
+                  })}
+                />
+              </div>
+              {errors.username && (
+                <p className="text-sm text-red-500">{errors.username.message}</p>
+              )}
+              {username && username.length >= 3 && !errors.username && (
+                <p className="text-sm text-green-600">Username is available</p>
+              )}
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                type="email"
                 placeholder="name@example.com"
+                type="email"
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect="off"
                 disabled={isLoading}
                 {...register('email')}
               />
               {errors.email && (
-                <p className="text-sm text-destructive">{errors.email.message}</p>
+                <p className="text-sm text-red-500">{errors.email.message}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -132,7 +209,11 @@ export default function RegisterPage() {
                 </p>
               )}
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isLoading || Object.keys(errors).length > 0}
+            >
               {isLoading && (
                 <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
               )}

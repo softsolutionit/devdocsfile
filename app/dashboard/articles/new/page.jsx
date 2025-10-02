@@ -57,6 +57,7 @@ export default function NewArticlePage() {
     metaTitle: '',
     metaDescription: ''
   });
+  const [tagInput, setTagInput] = useState('');
   
   const [coverImage, setCoverImage] = useState(null);
   const [preview, setPreview] = useState('');
@@ -69,8 +70,20 @@ export default function NewArticlePage() {
   const fileInputRef = useRef(null);
   const titleRef = useRef(null);
 
+  // Memoize the slugify function
+  const memoizedSlugify = useCallback((text) => {
+    return text
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-]+/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }, []);
+
   // Update form data and handle auto-slug generation
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     
     setFormData(prev => {
@@ -81,23 +94,23 @@ export default function NewArticlePage() {
       
       // Auto-generate slug when title changes and auto-generate is enabled
       if (name === 'title' && autoGenerateSlug) {
-        newData.slug = slugify(value);
+        newData.slug = memoizedSlugify(value);
       }
       
       return newData;
     });
-  };
+  }, [autoGenerateSlug, memoizedSlugify]);
   
   // Toggle auto-slug generation
-  const handleAutoSlugToggle = (checked) => {
+  const handleAutoSlugToggle = useCallback((checked) => {
     setAutoGenerateSlug(checked);
     if (checked && formData.title) {
       setFormData(prev => ({
         ...prev,
-        slug: slugify(formData.title)
+        slug: memoizedSlugify(formData.title)
       }));
     }
-  };
+  }, [formData.title, memoizedSlugify]);
 
   const handleContentChange = useCallback((markdown) => {
     setFormData(prev => ({
@@ -233,7 +246,15 @@ export default function NewArticlePage() {
     setIsSubmitting(true);
     
     try {
-      let coverImageUrl = formData.coverImage || '';
+      // Get current user's session
+      const sessionResponse = await fetch('/api/auth/session');
+      const session = await sessionResponse.json();
+      
+      if (!session?.user?.username) {
+        throw new Error('Please set up your username before creating articles');
+      }
+      
+      let coverImageUrl = '';
       
       // Upload cover image if a new one was selected
       if (coverImage) {
@@ -241,58 +262,52 @@ export default function NewArticlePage() {
         setUploadProgress(0);
         
         try {
-          // const result = await uploadFile(coverImage, {
-          //   provider: process.env.NEXT_PUBLIC_STORAGE_PROVIDER || 's3',
-          //   folder: 'article-covers',
-          //   onProgress: handleUploadProgress,
-          //   compression: {
-          //     maxSizeMB: 1,
-          //     maxWidthOrHeight: 2000,
-          //     useWebWorker: true,
-          //   },
-          // });
+          const formData = new FormData();
+          formData.append('file', coverImage);
           
-          const result = await handleFileUpload(coverImage);
-          coverImageUrl = result;
-          
-          toast.success('Image uploaded successfully', {
-            description: 'Your cover image has been uploaded.',
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
           });
           
-        } catch (error) {
-          console.error('Image upload error:', error);
-          toast.error('Failed to upload image', {
-            description: error.message || 'Please try again or select a different image.',
-          });
-          return; // Don't proceed with article creation if image upload fails
+          if (!uploadResponse.ok) {
+            const error = await uploadResponse.json();
+            throw new Error(error.error || 'Failed to upload image');
+          }
+          
+          const result = await uploadResponse.json();
+          coverImageUrl = result.url;
+        } catch (uploadError) {
+          console.error('Error uploading cover image:', uploadError);
+          throw new Error('Failed to upload cover image');
         } finally {
           setIsUploading(false);
-          setUploadProgress(0);
         }
       }
-
-      // Prepare article data
-      const articleData = {
-        ...formData,
-        coverImage: coverImageUrl,
-        // Ensure tags is an array of strings
-        tags: Array.isArray(formData.tags) 
-          ? formData.tags 
-          : (formData.tags || '').split(',').map(tag => tag.trim()).filter(Boolean),
-      };
-
+      
       // Create article
       const response = await fetch('/api/articles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(articleData),
+        body: JSON.stringify({
+          title: formData.title,
+          content: formData.content,
+          excerpt: formData.excerpt,
+          status: formData.status,
+          isFeatured: formData.isFeatured,
+          metaTitle: formData.metaTitle || null,
+          metaDescription: formData.metaDescription || null,
+          coverImage: coverImageUrl || null,
+          tags: formData.tags.map(tag => tag.name),
+        }),
       });
-
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create article');
+
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create article');
       }
       
       const article = await response.json();
@@ -301,7 +316,7 @@ export default function NewArticlePage() {
       toast.success('Article created successfully', {
         action: {
           label: 'View Article',
-          onClick: () => router.push(`/articles/${article.slug}`),
+          onClick: () => router.push(`/${session.user.username}/${article.slug}`),
         },
       });
       
@@ -326,6 +341,26 @@ export default function NewArticlePage() {
     }
   };
   
+  // Get user session with memoization
+  const [currentUser, setCurrentUser] = useState(null);
+  
+  // Fetch user session once on component mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userResponse = await fetch('/api/auth/session');
+        const session = await userResponse.json();
+        if (session?.user) {
+          setCurrentUser(session.user);
+        }
+      } catch (error) {
+        console.error('Error fetching user session:', error);
+      }
+    };
+    
+    fetchUser();
+  }, []);
+
   // Check if slug is available
   useEffect(() => {
     const checkSlug = async () => {
@@ -334,26 +369,57 @@ export default function NewArticlePage() {
         return;
       }
       
+      // Validate slug format
+      const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+      if (!slugRegex.test(debouncedSlug)) {
+        setSlugError('Invalid format. Use lowercase letters, numbers, and hyphens only.');
+        return;
+      }
+      
+      if (!currentUser?.username) {
+        setSlugError('Please set up your username first');
+        return;
+      }
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
       try {
-        const response = await fetch(`/api/articles/check-slug?slug=${encodeURIComponent(debouncedSlug)}`);
+        const response = await fetch(
+          `/api/articles/check-slug?slug=${encodeURIComponent(debouncedSlug)}&username=${encodeURIComponent(currentUser.username)}`,
+          { signal: controller.signal }
+        );
+        
+        clearTimeout(timeoutId);
+        
         const data = await response.json();
         
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to check slug');
+          throw new Error(data.error || 'Failed to check slug availability');
         }
         
-        setSlugError(data.available ? '' : 'This URL is already in use');
+        // Update the error state based on the API response
+        setSlugError(data.available ? '' : data.message || 'This URL is already in use');
       } catch (error) {
-        console.error('Error checking slug:', error);
-        // Don't show error to user for this background check
+        if (error.name !== 'AbortError') {
+          console.error('Error checking slug:', error);
+          // Only show error if it's not a 400/404 error (user input related)
+          if (error.message !== 'User not found' && !error.message.includes('required')) {
+            setSlugError('Error checking URL availability. Please try again.');
+          }
+        }
       }
     };
     
     checkSlug();
-  }, [debouncedSlug]);
+    
+    return () => {
+      // Cleanup function to handle component unmount
+    };
+  }, [debouncedSlug, currentUser]);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col space-y-6">
       <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
@@ -376,7 +442,284 @@ export default function NewArticlePage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6">
+           {/* Sidebar */}
+          <div className="grid col-span-full md:grid-flow-col grid-rows-1 md:grid-cols-2 gap-4">
+           
+            <div className="row-span-2 col-span-4">
+            {/* Cover Image Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Cover Image</CardTitle>
+                <CardDescription>
+                  Add a cover image to make your article stand out.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center w-full">
+                    <div className="w-full">
+                      {preview ? (
+                        <div className="relative group">
+                          <img
+                            src={preview}
+                            alt="Preview"
+                            className="h-48 w-full object-cover rounded-lg"
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={removeImage}
+                              className="p-2 bg-black/70 text-white rounded-full hover:bg-black/90 transition-colors"
+                              disabled={isSubmitting || isUploading}
+                              title="Remove image"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                          
+                          {/* Upload progress */}
+                          {isUploading && uploadProgress > 0 && (
+                            <div className="absolute bottom-0 left-0 right-0 p-2">
+                              <div className="bg-background/90 rounded-md p-2">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                  <span>Uploading...</span>
+                                  <span>{uploadProgress}%</span>
+                                </div>
+                                <Progress value={uploadProgress} className="h-1.5" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <label
+                          htmlFor="cover-image"
+                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-background hover:bg-accent/50 transition-colors ${
+                            (isSubmitting || isUploading) ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          <div className="flex flex-col items-center justify-center p-6 text-center">
+                            {isUploading ? (
+                              <>
+                                <Loader2 className="w-8 h-8 mb-2 text-muted-foreground animate-spin" />
+                                <p className="text-sm text-muted-foreground">Uploading...</p>
+                              </>
+                            ) : (
+                              <>
+                                <ImageIcon className="w-8 h-8 mb-2 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground">
+                                  Click to upload a cover image
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Max 5MB • JPG, PNG, WebP
+                                </p>
+                              </>
+                            )}
+                          </div>
+                          <input
+                            id="cover-image"
+                            ref={fileInputRef}
+                            type="file"
+                            className="hidden"
+                            accept="image/jpeg, image/png, image/webp"
+                            onChange={handleImageChange}
+                            disabled={isSubmitting || isUploading}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {coverImage && (
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span>File:</span>
+                      <span className="font-medium text-foreground truncate max-w-[180px]">
+                        {coverImage.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Size:</span>
+                      <span>{(coverImage.size / 1024 / 1024).toFixed(2)} MB</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Type:</span>
+                      <span className="uppercase">{coverImage.type.split('/')[1]}</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+              </Card>
+            </div>
+
+            <div className="col-span-full md:col-span-1">
+             {/* Publish Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Publish</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="status">Status</Label>
+                    <Badge 
+                      variant={formData.status === 'PUBLISHED' ? 'default' : 'outline'}
+                      className="capitalize"
+                    >
+                      {formData.status.toLowerCase()}
+                    </Badge>
+                  </div>
+                  <select
+                    id="status"
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isSubmitting}
+                  >
+                    <option value="DRAFT">Draft</option>
+                    <option value="PUBLISHED">Published</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <Label htmlFor="isFeatured">Featured</Label>
+                  <Switch
+                    id="isFeatured"
+                    checked={formData.isFeatured}
+                    onCheckedChange={(checked) => 
+                      setFormData(prev => ({ ...prev, isFeatured: checked }))
+                    }
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={isSubmitting || isUploading || (slugError && formData.slug.length > 0)}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {formData.status === 'DRAFT' ? 'Saving...' : 'Publishing...'}
+                      </>
+                    ) : formData.status === 'DRAFT' ? (
+                      'Save Draft'
+                    ) : (
+                      'Publish Article'
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            </div>
+            <div className="max-w-2xs col-span-full md:col-span-1">
+            {/* Tags Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Tags</CardTitle>
+                <CardDescription>
+                  {/* Add tags to help readers find your article. */}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Input
+                      id="tags"
+                      name="tags"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+                          e.preventDefault();
+                          const newTag = tagInput.trim().replace(/,/g, '');
+                          if (newTag && !formData.tags.includes(newTag)) {
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: [...prev.tags, newTag]
+                            }));
+                            setTagInput('');
+                          } else if (tagInput.endsWith(',')) {
+                            const newTag = tagInput.slice(0, -1).trim();
+                            if (newTag && !formData.tags.includes(newTag)) {
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: [...prev.tags, newTag]
+                              }));
+                            }
+                            setTagInput('');
+                          }
+                        } else if (e.key === 'Backspace' && !tagInput && formData.tags.length > 0) {
+                          // Remove last tag on backspace when input is empty
+                          e.preventDefault();
+                          const newTags = [...formData.tags];
+                          newTags.pop();
+                          setFormData(prev => ({
+                            ...prev,
+                            tags: newTags
+                          }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (tagInput.trim()) {
+                          const newTag = tagInput.trim();
+                          if (!formData.tags.includes(newTag)) {
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: [...prev.tags, newTag]
+                            }));
+                          }
+                          setTagInput('');
+                        }
+                      }}
+                      placeholder="Type and press Enter or comma to add tags"
+                      disabled={isSubmitting}
+                      className="pr-10"
+                    />
+                    {tagInput && (
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => setTagInput('')}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground">
+                    Press Enter or comma to add a tag
+                  </p>
+                  
+                  {formData.tags?.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {formData.tags.map((tag, index) => (
+                        <Badge 
+                          key={index} 
+                          variant="secondary" 
+                          className="font-normal group pr-1.5 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
+                          onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: prev.tags.filter((_, i) => i !== index)
+                            }));
+                          }}
+                        >
+                          {tag}
+                          <X className="ml-1 h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+              </Card>
+            </div>
+          </div>
           {/* Main content */}
           <div className="space-y-6 lg:col-span-2">
             <Card>
@@ -454,7 +797,7 @@ export default function NewArticlePage() {
                   </div>
                   <div className="flex rounded-md shadow-sm">
                     <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
-                      /articles/
+                      /{currentUser?.username || 'username'}/
                     </span>
                     <Input
                       id="slug"
@@ -570,216 +913,7 @@ export default function NewArticlePage() {
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6 lg:col-span-1">
-            {/* Publish Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Publish</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="status">Status</Label>
-                    <Badge 
-                      variant={formData.status === 'PUBLISHED' ? 'default' : 'outline'}
-                      className="capitalize"
-                    >
-                      {formData.status.toLowerCase()}
-                    </Badge>
-                  </div>
-                  <select
-                    id="status"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={isSubmitting}
-                  >
-                    <option value="DRAFT">Draft</option>
-                    <option value="PUBLISHED">Published</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <Label htmlFor="isFeatured">Featured</Label>
-                  <Switch
-                    id="isFeatured"
-                    checked={formData.isFeatured}
-                    onCheckedChange={(checked) => 
-                      setFormData(prev => ({ ...prev, isFeatured: checked }))
-                    }
-                    disabled={isSubmitting}
-                  />
-                </div>
-
-                <div className="pt-2">
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={isSubmitting || isUploading || (slugError && formData.slug.length > 0)}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {formData.status === 'DRAFT' ? 'Saving...' : 'Publishing...'}
-                      </>
-                    ) : formData.status === 'DRAFT' ? (
-                      'Save Draft'
-                    ) : (
-                      'Publish Article'
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Cover Image Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Cover Image</CardTitle>
-                <CardDescription>
-                  Add a cover image to make your article stand out.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-center w-full">
-                    <div className="w-full">
-                      {preview ? (
-                        <div className="relative group">
-                          <img
-                            src={preview}
-                            alt="Preview"
-                            className="h-48 w-full object-cover rounded-lg"
-                          />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={removeImage}
-                              className="p-2 bg-black/70 text-white rounded-full hover:bg-black/90 transition-colors"
-                              disabled={isSubmitting || isUploading}
-                              title="Remove image"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-                          
-                          {/* Upload progress */}
-                          {isUploading && uploadProgress > 0 && (
-                            <div className="absolute bottom-0 left-0 right-0 p-2">
-                              <div className="bg-background/90 rounded-md p-2">
-                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                                  <span>Uploading...</span>
-                                  <span>{uploadProgress}%</span>
-                                </div>
-                                <Progress value={uploadProgress} className="h-1.5" />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <label
-                          htmlFor="cover-image"
-                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-background hover:bg-accent/50 transition-colors ${
-                            (isSubmitting || isUploading) ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          <div className="flex flex-col items-center justify-center p-6 text-center">
-                            {isUploading ? (
-                              <>
-                                <Loader2 className="w-8 h-8 mb-2 text-muted-foreground animate-spin" />
-                                <p className="text-sm text-muted-foreground">Uploading...</p>
-                              </>
-                            ) : (
-                              <>
-                                <ImageIcon className="w-8 h-8 mb-2 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">
-                                  Click to upload a cover image
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Max 5MB • JPG, PNG, WebP
-                                </p>
-                              </>
-                            )}
-                          </div>
-                          <input
-                            id="cover-image"
-                            ref={fileInputRef}
-                            type="file"
-                            className="hidden"
-                            accept="image/jpeg, image/png, image/webp"
-                            onChange={handleImageChange}
-                            disabled={isSubmitting || isUploading}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                {coverImage && (
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span>File:</span>
-                      <span className="font-medium text-foreground truncate max-w-[180px]">
-                        {coverImage.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Size:</span>
-                      <span>{(coverImage.size / 1024 / 1024).toFixed(2)} MB</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Type:</span>
-                      <span className="uppercase">{coverImage.type.split('/')[1]}</span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Tags Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Tags</CardTitle>
-                <CardDescription>
-                  Add tags to help readers find your article.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Input
-                    id="tags"
-                    name="tags"
-                    value={Array.isArray(formData.tags) ? formData.tags.join(', ') : formData.tags}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData(prev => ({
-                        ...prev,
-                        tags: value.split(',').map(tag => tag.trim()).filter(Boolean)
-                      }));
-                    }}
-                    placeholder="tag1, tag2, tag3"
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Separate tags with commas
-                  </p>
-                  
-                  {formData.tags?.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {formData.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary" className="font-normal">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+         
         </div>
 
         {/* Bottom action bar - fixed to bottom on mobile */}

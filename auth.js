@@ -6,11 +6,44 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import prisma from './lib/prisma';
 
-// Ensure NEXTAUTH_SECRET is set in production
+// Generate a URL-friendly username from email
+const generateUsername = (email) => {
+  
+  let username = email.split('@')[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_')  
+    .replace(/_+/g, '_')           
+    .replace(/^_|_$/g, '');       
+
+  if (username.length < 3) {
+    username = username.padEnd(3, '_');
+  }
+  
+  return username.substring(0, 30);
+};
+
+const getUniqueUsername = async (baseUsername) => {
+  let username = baseUsername;
+  let counter = 1;
+  
+  while (true) {
+    const existingUser = await prisma.user.findUnique({
+      where: { username }
+    });
+    
+    if (!existingUser) {
+      return username;
+    }
+    
+    const suffix = counter.toString();
+    username = `${baseUsername.substring(0, 30 - suffix.length - 1)}_${suffix}`;
+    counter++;
+  }
+};
+
 if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
   throw new Error('NEXTAUTH_SECRET is required in production');
 }
-
 const secret = process.env.NEXTAUTH_SECRET;
 
 export const authOptions = {
@@ -84,6 +117,45 @@ export const authOptions = {
   
   callbacks: {
     async signIn({ user, account, profile }) {
+      // Only handle OAuth sign-ins
+      if (account?.provider !== 'credentials') {
+        try {
+          // Generate a base username from email
+          const baseUsername = generateUsername(user.email);
+          
+          // Check if user already exists
+          const existingUser = await prisma.user.findUnique({
+            where: { email: user.email },
+          });
+          
+          if (!existingUser) {
+            // New OAuth user - generate a unique username
+            const username = await getUniqueUsername(baseUsername);
+            
+            // Update the user with the generated username
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { 
+                username,
+                emailVerified: new Date(),
+                role: 'USER',
+                // Add any other default fields you need
+              },
+            });
+          } else if (!existingUser.username) {
+            // Existing user without username - generate one
+            const username = await getUniqueUsername(baseUsername);
+            await prisma.user.update({
+              where: { id: existingUser.id },
+              data: { username },
+            });
+          }
+        } catch (error) {
+          console.error('Error during OAuth sign-in:', error);
+          // Don't block sign-in if username generation fails
+        }
+      }
+      
       return true;
     },
     
@@ -104,6 +176,7 @@ export const authOptions = {
       if (token) {
         session.user.id = token.sub; 
         session.user.role = token.role;
+        session.user.username = token.username;
       }
       return session;
     },
@@ -111,6 +184,19 @@ export const authOptions = {
     async jwt({ token, user, account }) {
       if (user) {
         token.role = user.role || 'USER';
+        
+        // Only fetch user data if we don't have it yet or if this is a sign-in
+        if (!token.username || account) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { username: true, role: true }
+          });
+          
+          if (dbUser) {
+            token.username = dbUser.username;
+            token.role = dbUser.role || 'USER';
+          }
+        }
       }
       return token;
     },

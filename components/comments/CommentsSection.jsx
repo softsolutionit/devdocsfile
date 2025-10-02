@@ -8,10 +8,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Icons } from '@/components/icons';
+import { MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { CommentLikeButton } from './CommentLikeButton';
 
-export default function CommentsSection({ articleSlug }) {
+export default function CommentsSection({ articleId }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [comments, setComments] = useState([]);
@@ -31,7 +32,7 @@ export default function CommentsSection({ articleSlug }) {
 
   const fetchComments = useCallback(async (parentId = null) => {
     try {
-      const url = `/api/articles/${articleSlug}/comments${
+      const url = `/api/articles/${articleId}/comments${
         parentId ? `?parentId=${parentId}` : ''
       }`;
       
@@ -63,29 +64,20 @@ export default function CommentsSection({ articleSlug }) {
     } finally {
       setLoading(false);
     }
-  }, [articleSlug, toast]);
+  }, [articleId, toast]);
 
-  useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
-
-  const handleSubmit = useCallback(async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!session) {
-      router.push(`/auth/signin?callbackUrl=/articles/${articleSlug}`);
-      return;
-    }
     
     if (!content.trim()) {
       toast.error('Comment cannot be empty');
       return;
     }
-    
+
     setSubmitting(true);
     
     try {
-      const response = await fetch(`/api/articles/${articleSlug}/comments`, {
+      const response = await fetch(`/api/articles/${articleId}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +107,11 @@ export default function CommentsSection({ articleSlug }) {
     } finally {
       setSubmitting(false);
     }
-  }, [articleSlug, content, fetchComments, replyingTo, router, session]);
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
 
   useEffect(() => {
     if (status === 'authenticated' && comments.length > 0) {
@@ -152,7 +148,7 @@ export default function CommentsSection({ articleSlug }) {
 
   const handleLike = useCallback(async (commentId, isLiked) => {
     if (!session) {
-      router.push(`/auth/signin?callbackUrl=/articles/${articleSlug}`);
+      router.push(`/auth/signin?callbackUrl=/articles/${articleId}`);
       return;
     }
     
@@ -189,7 +185,7 @@ export default function CommentsSection({ articleSlug }) {
       console.error('Error toggling like:', error);
       toast.error('Failed to update like');
     }
-  }, [articleSlug, router, session]);
+  }, [articleId, router, session]);
 
   const renderComment = (comment, depth = 0) => (
     <div 
@@ -282,13 +278,13 @@ export default function CommentsSection({ articleSlug }) {
   }
 
   return (
-    <div className="mt-12">
-      <h3 className="text-lg font-medium mb-6">
+    <div className="mt-8">
+      <h2 className="text-2xl font-bold mb-6 flex items-center">
+        <MessageSquare className="mr-2 h-5 w-5" />
         Comments {comments.length > 0 && `(${comments.length})`}
-      </h3>
-
-      {/* Comment form */}
-      {session ? (
+      </h2>
+      
+      {status === 'authenticated' ? (
         <form onSubmit={handleSubmit} className="mb-8">
           <div className="flex space-x-3">
             <Avatar className="h-10 w-10">

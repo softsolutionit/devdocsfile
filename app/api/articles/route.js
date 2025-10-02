@@ -82,7 +82,7 @@ export async function POST(request) {
       );
     }
 
-    const { title, content, excerpt, tags, status = 'DRAFT', coverImage } = await request.json();
+    const { title, content, excerpt, tags, status = 'DRAFT', coverImage, slug: customSlug } = await request.json();
 
     if (!title || !content) {
       return NextResponse.json(
@@ -91,29 +91,61 @@ export async function POST(request) {
       );
     }
 
-    const slug = title
+    // Generate slug from title if not provided
+    const baseSlug = customSlug || title
       .toLowerCase()
       .replace(/[^\w\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/--+/g, '-');
 
+    // Get the author's username
+    const author = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { username: true }
+    });
+
+    if (!author?.username) {
+      return NextResponse.json(
+        { error: 'User must have a username to create articles' },
+        { status: 400 }
+      );
+    }
+
+    // Check if an article with the same slug already exists for this user
+    const existingArticle = await prisma.article.findFirst({
+      where: {
+        authorUsername: author.username,
+        slug: baseSlug,
+      },
+    });
+
+    if (existingArticle) {
+      return NextResponse.json(
+        { error: 'An article with this URL already exists in your profile' },
+        { status: 409 }
+      );
+    }
+
     // Create or connect tags
-    const tagConnections = tags?.map((tag) => ({
-      tag: {
-        connectOrCreate: {
-          where: { name: tag },
-          create: {
-            name: tag,
-            slug: tag.toLowerCase().replace(/\s+/g, '-'),
+    const tagConnections = (Array.isArray(tags) ? tags : [])
+      .filter(tag => tag && typeof tag === 'string' && tag.trim() !== '')
+      .map((tag) => ({
+        tag: {
+          connectOrCreate: {
+            where: { name: tag },
+            create: {
+              name: tag,
+              slug: tag.toLowerCase().replace(/\s+/g, '-'),
+            },
           },
         },
-      },
-    })) || [];
+      })) || [];
 
     const article = await prisma.article.create({
       data: {
         title,
-        slug,
+        slug: baseSlug,
+        authorUsername: author.username,
         content,
         excerpt: excerpt || content.substring(0, 200) + '...',
         status,
@@ -130,6 +162,7 @@ export async function POST(request) {
           select: {
             id: true,
             name: true,
+            username: true,
             image: true,
           },
         },

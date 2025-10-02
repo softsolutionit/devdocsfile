@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation';
 
-export function ArticleLikeButton({ articleSlug, initialLikesCount = 0, initialLiked = false }) {
+export function ArticleLikeButton({ articleId, initialLikesCount = 0, initialLiked = false }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(initialLiked);
@@ -38,7 +38,7 @@ export function ArticleLikeButton({ articleSlug, initialLikesCount = 0, initialL
     
     try {
       const method = isLiked ? 'DELETE' : 'POST';
-      const response = await fetch(`/api/articles/${articleSlug}/like`, {
+      const response = await fetch(`/api/articles/${articleId}/like`, {
         method,
         headers: {
           'Content-Type': 'application/json',

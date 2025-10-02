@@ -28,12 +28,12 @@ export default function RootLayout({ children }) {
       >
         <Providers>
           <MainNav />
-          <div className="flex-1 px-2 md:px-10">
+          <div className="flex-1 ">
             <main className="flex-1">
               {children}
             </main>
           </div>
-          <Footer />
+          {/* <Footer /> */}
           <Toaster position="top-center" />
         </Providers>
       </body>

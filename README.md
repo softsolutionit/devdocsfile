@@ -2,7 +2,6 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-13+-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
 A modern documentation platform built with Next.js, designed to provide a seamless experience for developers to create, manage, and share technical documentation.
 
@@ -13,7 +12,13 @@ A modern documentation platform built with Next.js, designed to provide a seamle
 - **Dark/Light Mode** - Built-in theme support
 - **Search** - Fast and accurate documentation search
 - **MDX Support** - Write with Markdown and JSX
-- **TypeScript** - Type-safe codebase
+- **Authentication** - Secure user authentication
+- **Role-based Access Control** - Admin and User roles
+- **File Upload** - Upload cover images for articles
+- **Comments** - Add comments to articles
+- **Bookmarks** - Save articles for later
+- **Likes** - Like articles
+- **Notifications** - Get notified about new comments and likes
 
 ## 🚀 Getting Started
 
@@ -26,7 +31,7 @@ A modern documentation platform built with Next.js, designed to provide a seamle
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/devdocsfile.git
+   git clone https://github.com/softsolutionit/devdocsfile.git
    cd devdocsfile
    ```
 
@@ -54,10 +59,15 @@ A modern documentation platform built with Next.js, designed to provide a seamle
 
 - **Framework**: [Next.js](https://nextjs.org/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **Type Checking**: [TypeScript](https://www.typescriptlang.org/)
 - **Linting**: [ESLint](https://eslint.org/)
 - **Formatting**: [Prettier](https://prettier.io/)
-- **Deployment**: [Vercel](https://vercel.com/)
+- **Deployment**: [VPS](https://devdocsfile.com/)
+- **Server**: [Node.js](https://nodejs.org/)
+- **Github Actions**: [Github Actions](https://github.com/features/actions)
+- **Database**: [MongoDB](https://www.mongodb.com/)
+- **Authentication**: [NextAuth.js](https://next-auth.js.org/)
+- **File Upload**: [AWS S3](https://aws.amazon.com/s3/)
+- **Schema**: [Prisma](https://prisma.io/)
 
 ## 📂 Project Structure
 
@@ -69,7 +79,8 @@ devdocsfile/
 ├── styles/              # Global styles
 ├── content/             # Documentation content
 ├── lib/                 # Utility functions
-└── types/               # TypeScript type definitions
+├── prisma/              # Database schema and migrations
+└── .env                 # Environment variables
 ```
 
 ## 📝 Contributing
@@ -91,3 +102,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Tailwind CSS](https://tailwindcss.com/docs)
 - [MDX](https://mdxjs.com/)
+- [Prisma](https://prisma.io/)
+- [NextAuth.js](https://next-auth.js.org/)
+- [AWS S3](https://aws.amazon.com/s3/)
+- [MongoDB](https://www.mongodb.com/)
+

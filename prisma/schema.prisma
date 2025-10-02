@@ -22,6 +22,7 @@ enum ArticleStatus {
 model User {
   id            String          @id @default(auto()) @map("_id") @db.ObjectId
   name          String?
+  username      String          @unique
   email         String?         @unique
   emailVerified DateTime?
   image         String?
@@ -82,7 +83,7 @@ model VerificationToken {
 model Article {
   id          String        @id @default(auto()) @map("_id") @db.ObjectId
   title       String
-  slug        String        @unique
+  slug        String
   content     Json
   excerpt     String?
   coverImage  String?
@@ -90,6 +91,11 @@ model Article {
   viewCount   Int           @default(0)
   author      User          @relation(fields: [authorId], references: [id])
   authorId    String        @db.ObjectId
+  authorUsername String
+  
+  @@unique([authorUsername, slug])
+  @@index([authorUsername])
+  @@index([authorId])
   tags        ArticleTag[]
   comments    Comment[]
   bookmarks   Bookmark[]

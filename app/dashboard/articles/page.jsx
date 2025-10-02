@@ -110,7 +110,7 @@ export default function ArticlesPage() {
                         </Link>
                       </Button>
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/articles/${article.slug}`} target="_blank">
+                        <Link href={`/${article.authorUsername}/${article.slug}`} target="_blank">
                           View
                         </Link>
                       </Button>

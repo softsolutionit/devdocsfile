@@ -71,7 +71,7 @@ export default async function Home() {
   }
 
   return (
-    <>
+    <div className='px-2 md:px-10'>
       {/* Hero Section */}
       <section className="text-center py-16 md:py-24">
         <h1 className="text-4xl md:text-6xl font-bold mb-6">
@@ -235,6 +235,6 @@ export default async function Home() {
           ))}
         </div>
       </section>
-    </>
+    </div>
   );
 }
