@@ -226,7 +226,7 @@ export default async function ArticlesPage({ searchParams: searchParamsPromise }
                     </time>
                   </div>
                   <CardTitle className="text-xl">
-                    <Link href={`/articles/${article.slug}`} className="hover:underline">
+                    <Link href={`/${article.authorUsername}/${article.slug}`} className="hover:underline">
                       {article.title}
                     </Link>
                   </CardTitle>
@@ -240,7 +240,7 @@ export default async function ArticlesPage({ searchParams: searchParamsPromise }
                       {article.categories.slice(0, 2).map((category) => (
                         <Link
                           key={category.id}
-                          href={`/articles?category=${category.slug}`}
+                          href={`/${article.authorUsername}/articles?category=${category.slug}`}
                           className="px-2 py-1 text-xs rounded-full bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
                         >
                           {category.name}

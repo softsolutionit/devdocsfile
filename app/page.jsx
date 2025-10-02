@@ -135,7 +135,7 @@ export default async function Home() {
                   </time>
                 </div>
                 <CardTitle className="text-xl">
-                  <Link href={`/articles/${article.slug}`} className="hover:underline">
+                  <Link href={`/${article.authorUsername}/${article.slug}`} className="hover:underline">
                     {article.title}
                   </Link>
                 </CardTitle>
