@@ -120,39 +120,37 @@ export const authOptions = {
       // Only handle OAuth sign-ins
       if (account?.provider !== 'credentials') {
         try {
-          // Generate a base username from email
           const baseUsername = generateUsername(user.email);
           
-          // Check if user already exists
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email },
           });
           
           if (!existingUser) {
-            // New OAuth user - generate a unique username
             const username = await getUniqueUsername(baseUsername);
             
-            // Update the user with the generated username
             await prisma.user.update({
               where: { id: user.id },
               data: { 
                 username,
                 emailVerified: new Date(),
                 role: 'USER',
-                // Add any other default fields you need
+                name: user.name || user.email.split('@')[0],
               },
             });
+            user.username = username;
           } else if (!existingUser.username) {
-            // Existing user without username - generate one
             const username = await getUniqueUsername(baseUsername);
             await prisma.user.update({
               where: { id: existingUser.id },
               data: { username },
             });
+            user.username = username;
+          } else {
+            user.username = existingUser.username;
           }
         } catch (error) {
           console.error('Error during OAuth sign-in:', error);
-          // Don't block sign-in if username generation fails
         }
       }
       
