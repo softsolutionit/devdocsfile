@@ -109,6 +109,18 @@ export default function RegisterPage() {
     }
   };
 
+  const handleOAuthRegister = async (provider) => {
+    setIsLoading(true);
+    try {
+      await signIn(provider, {
+        callbackUrl: '/dashboard',
+      });
+    } catch (error) {
+      setError('An error occurred during sign in');
+      setIsLoading(false);
+    }
+  }
+
   return (
     <div className="container flex h-screen w-screen flex-col items-center justify-center">
       <Card className="w-full max-w-md">
@@ -120,11 +132,19 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-2 gap-6">
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              disabled={isLoading}
+              onClick={()=> handleOAuthRegister('github')}
+            >
               <Icons.gitHub className="mr-2 h-4 w-4" />
               GitHub
             </Button>
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              disabled={isLoading}
+              onClick={()=> handleOAuthRegister('google')}
+            >
               <Icons.google className="mr-2 h-4 w-4" />
               Google
             </Button>

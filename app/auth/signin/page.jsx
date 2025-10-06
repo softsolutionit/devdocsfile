@@ -28,7 +28,6 @@ export default function SignInPage() {
         password,
       });
 
-      console.log('SignIn result:', result);
 
       if (result.error) {
         setError(result.error);

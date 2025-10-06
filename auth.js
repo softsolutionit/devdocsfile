@@ -47,7 +47,24 @@ if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
 const secret = process.env.NEXTAUTH_SECRET;
 
 export const authOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter({
+    ...prisma,
+    // Override the createUser method to ensure username is set
+    async createUser(userData) {
+      const baseUsername = generateUsername(userData.email);
+      const username = await getUniqueUsername(baseUsername);
+      
+      return prisma.user.create({
+        data: {
+          ...userData,
+          username,
+          name: userData.name || userData.email.split('@')[0],
+          emailVerified: userData.emailVerified || new Date(),
+          role: 'USER',
+        },
+      });
+    },
+  }),
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -103,10 +120,18 @@ export const authOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          access_type: 'offline',
+          prompt: 'consent',
+          response_type: 'code',
+        }
+      }
     }),
     GitHubProvider({
       clientId: process.env.GITHUB_ID,
       clientSecret: process.env.GITHUB_SECRET,
+
     }),
   ],
   
@@ -122,24 +147,17 @@ export const authOptions = {
         try {
           const baseUsername = generateUsername(user.email);
           
+          // Check if user already exists
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email },
           });
           
           if (!existingUser) {
-            const username = await getUniqueUsername(baseUsername);
-            
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { 
-                username,
-                emailVerified: new Date(),
-                role: 'USER',
-                name: user.name || user.email.split('@')[0],
-              },
-            });
-            user.username = username;
+            // For new users, the user is already created by the adapter
+            // Just ensure the username is set on the user object
+            user.username = await getUniqueUsername(baseUsername);
           } else if (!existingUser.username) {
+            // For existing users without a username
             const username = await getUniqueUsername(baseUsername);
             await prisma.user.update({
               where: { id: existingUser.id },
@@ -147,6 +165,7 @@ export const authOptions = {
             });
             user.username = username;
           } else {
+            // For existing users with a username
             user.username = existingUser.username;
           }
         } catch (error) {
@@ -241,7 +260,7 @@ export const authOptions = {
     },
   },
   
-  debug: process.env.NODE_ENV === 'development',
+  // debug: process.env.NODE_ENV === 'development',
 };
 
 export const { handlers, signIn, signOut, auth } = NextAuth(authOptions);
