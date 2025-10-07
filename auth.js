@@ -260,7 +260,7 @@ export const authOptions = {
     },
   },
   
-  // debug: process.env.NODE_ENV === 'development',
+  debug: process.env.NODE_ENV === 'development',
 };
 
 export const { handlers, signIn, signOut, auth } = NextAuth(authOptions);
