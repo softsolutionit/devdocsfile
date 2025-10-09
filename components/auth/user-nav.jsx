@@ -46,7 +46,7 @@ export function UserNav({ user }) {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/account" className="w-full">
+            <Link href="/dashboard/profile" className="w-full">
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
               <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>

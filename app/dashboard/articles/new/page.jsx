@@ -285,7 +285,7 @@ export default function NewArticlePage() {
         }
       }
       
-      // Create article
+      // Create article 
       const response = await fetch('/api/articles', {
         method: 'POST',
         headers: {

@@ -14,8 +14,38 @@ import { ShareButton } from '@/components/share-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { auth } from '@/auth';
 import Link from 'next/link';
+import { readTime } from '@/utils/readTime';
 
-export default async function ArticlePage({ params }) {
+export async function generateMetadata({ params, searchParams}, parent) {
+  const { username, slug } = await params;
+
+  const article = await prisma.article.findFirst({
+    where: {
+      slug,
+      authorUsername: username,
+      status: 'PUBLISHED'
+    }
+  })
+
+
+  if (!article) {
+    return {
+      title: 'Article Not Found',
+    }
+  }
+
+  console.log("GENRATED MetaData: ", article)
+
+  return {
+    title: article.title,
+    description: article.excerpt || article.content,
+    openGraph: {
+      images: article.coverImage ? [article.coverImage] : ["/articles/dev-docs-file.png"],
+    },
+  }
+}
+
+export default async function ArticlePage({ params, searchParams }) {
   const { username, slug } = await params;
   const session = await auth();
   
@@ -67,7 +97,7 @@ export default async function ArticlePage({ params }) {
     notFound();
   }
 
-  // Increment view count
+  // Increment view count 
   await prisma.article.update({
     where: { id: article.id },
     data: {
@@ -77,8 +107,10 @@ export default async function ArticlePage({ params }) {
     },
   });
 
-  const readingTime = Math.ceil(article.content.split(/\s+/).length / 200); // 200 words per minute
+  const readingTime =  readTime(article.content)
   const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${username}/${slug}`;
+
+
 
   return (
     <div className="container max-w-4xl py-8">

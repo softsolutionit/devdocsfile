@@ -17,17 +17,17 @@ export function MainNav() {
         <div className="flex items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Icons.logo className="h-6 w-6" />
-            <span className="font-bold">DevDocs</span>
+            <span className="font-bold">DevDocsFile</span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
             <Link
-              href="/docs"
+              href="/articles"
               className="transition-colors hover:text-foreground/80 text-foreground/60"
             >
               Documentation
             </Link>
             <Link
-              href="/blog"
+              href="/articles"
               className="transition-colors hover:text-foreground/80 text-foreground/60"
             >
               Blog

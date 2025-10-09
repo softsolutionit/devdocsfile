@@ -80,7 +80,7 @@ export async function POST(request) {
         { error: 'You must be signed in to create an article' },
         { status: 401 }
       );
-    }
+    } 
 
     const { title, content, excerpt, tags, status = 'DRAFT', coverImage, slug: customSlug } = await request.json();
 

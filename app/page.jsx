@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Footer } from "@/components/layout/footer";
 
 // Opt out of static generation for this page
 export const dynamic = 'force-dynamic';
@@ -235,6 +236,9 @@ export default async function Home() {
           ))}
         </div>
       </section>
+
+      <Footer />
+      
     </div>
   );
 }

@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 import { MainNav } from "@/components/main-nav";
-import { Footer } from "@/components/layout/footer";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,9 +16,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "DevDocs",
-  description: "Developer documentation and knowledge base",
-};
+  title: 'DevDocsFile - Developer Documentation Hub',
+  description: 'Comprehensive developer documentation and API references',
+  keywords: 'documentation, api, developer, docs',
+}
 
 export default function RootLayout({ children }) {
   return (
@@ -33,7 +34,6 @@ export default function RootLayout({ children }) {
               {children}
             </main>
           </div>
-          {/* <Footer /> */}
           <Toaster position="top-center" />
         </Providers>
       </body>

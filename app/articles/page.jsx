@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, ArrowRight, Clock, Calendar, Tag, Filter } from 'lucide-react';
+import { readTime } from '@/utils/readTime';
 
 export default async function ArticlesPage({ searchParams: searchParamsPromise }) {
   // const session = await getServerSession(authOptions);
@@ -250,7 +251,7 @@ export default async function ArticlesPage({ searchParams: searchParamsPromise }
                   )}
                 </CardContent>
                 <CardFooter className="flex justify-between items-center text-sm text-muted-foreground">
-                  <span>{article.readingTime || '5'} min read</span>
+                  <span>{readTime(article.content) || '15'} min read</span>
                   <div className="flex items-center gap-4">
                     <span className="flex items-center gap-1">
                       <svg
