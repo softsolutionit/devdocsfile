@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { Heart, HeartOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; 
 
 export function ArticleLikeButton({ articleId, initialLikesCount = 0, initialLiked = false }) {
   const { data: session, status } = useSession();
@@ -26,7 +26,7 @@ export function ArticleLikeButton({ articleId, initialLikesCount = 0, initialLik
     if (!session) {
       // Redirect to sign in with a callback URL
       router.push(`/auth/signin?callbackUrl=${encodeURIComponent(window.location.pathname)}`);
-      toast({
+      toast("Sign in required", {
         title: 'Sign in required',
         description: 'You need to be signed in to like articles',
         variant: 'default',
@@ -63,7 +63,7 @@ export function ArticleLikeButton({ articleId, initialLikesCount = 0, initialLik
       
     } catch (error) {
       console.error('Error updating like status:', error);
-      toast({
+      toast("Error", {
         title: 'Error',
         description: error.message || 'Failed to update like status',
         variant: 'destructive',

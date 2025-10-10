@@ -34,7 +34,6 @@ export async function generateMetadata({ params, searchParams}, parent) {
     }
   }
 
-  console.log("GENRATED MetaData: ", article)
 
   return {
     title: article.title,
@@ -91,7 +90,6 @@ export default async function ArticlePage({ params, searchParams }) {
     },
   });
 
-  console.log(article);
 
   if (!article) {
     notFound();

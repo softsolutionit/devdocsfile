@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const article = await prisma.article.findUnique({
       where: { id },
@@ -54,7 +54,7 @@ export async function PUT(request, { params }) {
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const { title, content, excerpt, status, tags = [] } = await request.json();
 
     // Check if article exists and user is the author
@@ -118,7 +118,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Check if article exists and user is the author
     const article = await prisma.article.findUnique({
