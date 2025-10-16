@@ -55,7 +55,7 @@ export async function PUT(request, { params }) {
     }
 
     const { id } = await params;
-    const { title, content, excerpt, status, tags = [] } = await request.json();
+    const { title, content, excerpt, status, coverImage, metaTitle, metaDescription, tags = [] } = await request.json();
 
     // Check if article exists and user is the author
     const existingArticle = await prisma.article.findUnique({
@@ -77,7 +77,39 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // Update article
+    // Handle tags separately - find or create tags first
+    // Filter out null/undefined tags and ensure we have valid tag names
+    const validTags = tags.filter(tag => tag && typeof tag === 'string' && tag.trim().length > 0);
+
+    const tagOperations = validTags.map(async (tagName) => {
+      const normalizedName = tagName.toLowerCase();
+      const tagSlug = normalizedName.replace(/\s+/g, '-');
+
+      // Try to find existing tag
+      let tag = await prisma.tag.findUnique({
+        where: { name: normalizedName }
+      });
+
+      // Create tag if it doesn't exist
+      if (!tag) {
+        tag = await prisma.tag.create({
+          data: {
+            name: normalizedName,
+            slug: tagSlug
+          }
+        });
+      }
+
+      return tag;
+    });
+
+    // Wait for all tag operations to complete
+    const tagRecords = await Promise.all(tagOperations);
+
+    // Get tag IDs
+    const tagIds = tagRecords.map(tag => tag.id);
+
+    // Update article with new tag connections
     const updatedArticle = await prisma.article.update({
       where: { id },
       data: {
@@ -85,16 +117,25 @@ export async function PUT(request, { params }) {
         content,
         excerpt,
         status,
+        coverImage,
+        metaTitle,
+        metaDescription,
+        // Disconnect all existing tags and connect new ones
         tags: {
-          set: [], // Clear existing tags
-          connectOrCreate: tags.map((tag) => ({
-            where: { name: tag.toLowerCase() },
-            create: { name: tag.toLowerCase() },
-          })),
+          deleteMany: {},
+          create: tagIds.map(tagId => ({
+            tag: {
+              connect: { id: tagId }
+            }
+          }))
         },
       },
       include: {
-        tags: true,
+        tags: {
+          include: {
+            tag: true
+          }
+        },
       },
     });
 

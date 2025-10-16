@@ -140,6 +140,11 @@ export default async function ArticlePage({ params, searchParams }) {
               <MessageSquare className="h-4 w-4" />
               <span>{article._count.comments} comments</span>
             </div>
+            <span>•</span>
+            <div className="flex items-center gap-1">
+              <BookOpen className="h-4 w-4" />
+              <span>{article.viewCount} Views</span>
+            </div>
           </div>
 
           {article.coverImage && (
@@ -147,7 +152,7 @@ export default async function ArticlePage({ params, searchParams }) {
               <img
                 src={article.coverImage}
                 alt={article.title}
-                className="w-full h-auto max-h-[500px] object-cover"
+                className="w-full h-auto object-cover"
               />
             </div>
           )}

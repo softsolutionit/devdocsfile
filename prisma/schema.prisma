@@ -87,6 +87,8 @@ model Article {
   content     Json
   excerpt     String?
   coverImage  String?
+  metaTitle   String?
+  metaDescription String?
   status      ArticleStatus @default(DRAFT)
   viewCount   Int           @default(0)
   author      User          @relation(fields: [authorId], references: [id])

@@ -2,29 +2,31 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef } from 'react';
-import { useSession } from 'next-auth/react';
 import {
   MDXEditor,
-  headingsPlugin,
-  listsPlugin,
-  quotePlugin,
-  thematicBreakPlugin,
-  markdownShortcutPlugin,
-  tablePlugin,
-  imagePlugin,
-  linkPlugin,
-  linkDialogPlugin,
-  toolbarPlugin,
-  diffSourcePlugin,
-  frontmatterPlugin,
+  BoldItalicUnderlineToggles,
   codeBlockPlugin,
   codeMirrorPlugin,
-  directivesPlugin,
-  AdmonitionDirectiveDescriptor,
-  KitchenSinkToolbar
+  CodeToggle,
+  diffSourcePlugin,
+  DiffSourceToggleWrapper,
+  headingsPlugin,
+  listsPlugin,
+  linkPlugin,
+  markdownShortcutPlugin,
+  toolbarPlugin,
+  tablePlugin,
+  thematicBreakPlugin,
+  quotePlugin,
+  ListsToggle,
+  InsertTable,
+  CreateLink,
+  InsertThematicBreak,
+  BlockTypeSelect,
+  UndoRedo,
+  InsertCodeBlock,
 } from '@mdxeditor/editor';
 import '@mdxeditor/editor/style.css';
-import { compressImage } from '@/utils/imageUtils';
 
 const MDXEditorWithToolbar = ({ 
   markdown = '', 
@@ -32,99 +34,7 @@ const MDXEditorWithToolbar = ({
   className = '',
   readOnly = false 
 }) => {
-  const { data: session } = useSession();
-  const previousMarkdownRef = useRef(markdown);
-  const processedMarkdownRef = useRef(markdown);
-
-  // Extract all image URLs from markdown
-  const extractImageUrls = (content) => {
-    if (!content) return new Set();
-    const imageRegex = /!\[.*?\]\((.*?)\)/g;
-    const matches = [];
-    let match;
-    while ((match = imageRegex.exec(content)) !== null) {
-      matches.push(match[1]);
-    }
-    return new Set(matches);
-  };
-
-  // Handle image upload
-  const handleImageUpload = useCallback(async (file) => {
-    try {
-      if (!session?.user?.id) {
-        throw new Error('User not authenticated');
-      }
-
-      // Compress the image to max 150KB
-      const compressedFile = await compressImage(file);
-      
-      const formData = new FormData();
-      formData.append('file', compressedFile);
-
-      const response = await fetch('/api/images/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to upload image');
-      }
-
-      const { url } = await response.json();
-      return url;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  }, [session]);
-
-  // Handle image deletion
-  const handleImageDelete = useCallback(async (imageUrl) => {
-    try {
-      if (!session?.user?.id) {
-        throw new Error('User not authenticated');
-      }
-
-      const response = await fetch('/api/images/upload', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ imageUrl }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Failed to delete image:', error);
-      }
-    } catch (error) {
-      console.error('Error deleting image:', error);
-    }
-  }, [session]);
-
-  // Track markdown changes and handle deleted images
-  useEffect(() => {
-    const previousMarkdown = previousMarkdownRef.current;
-    const currentMarkdown = markdown;
-    
-    if (previousMarkdown !== currentMarkdown) {
-      const previousImages = extractImageUrls(previousMarkdown);
-      const currentImages = extractImageUrls(currentMarkdown);
-      
-      // Find images that were in previous markdown but not in current
-      const deletedImages = [...previousImages].filter(url => !currentImages.has(url));
-      
-      // Delete the removed images
-      deletedImages.forEach(url => {
-        if (url.startsWith('/articles/images/')) { // Only delete our own images
-          handleImageDelete(url);
-        }
-      });
-      
-      previousMarkdownRef.current = currentMarkdown;
-    }
-  }, [markdown, handleImageDelete]);
+  
 
   return (
     <div className={`mdx-editor-container ${className}`}>
@@ -133,27 +43,15 @@ const MDXEditorWithToolbar = ({
         onChange={onChange}
         readOnly={readOnly}
         plugins={[
-          // Basic markdown features
+          // Essential plugins for basic functionality
           headingsPlugin(),
           listsPlugin(),
-          quotePlugin(),
-          thematicBreakPlugin(),
-          markdownShortcutPlugin(),
-          
-          // Tables
-          tablePlugin(),
-          
-          // Media
-          imagePlugin({
-            imageUploadHandler: handleImageUpload,
-            // Remove onImageDelete as it's not a valid prop
-            imageAutocompleteSuggestions: []
-          }),
-          
-          // Links
           linkPlugin(),
-          linkDialogPlugin(),
-          // Code blocks
+          quotePlugin(),
+          tablePlugin(),
+          thematicBreakPlugin(),
+          
+          // Code related plugins
           codeBlockPlugin({ defaultCodeBlockLanguage: 'js' }),
           codeMirrorPlugin({
             codeBlockLanguages: { 
@@ -171,32 +69,35 @@ const MDXEditorWithToolbar = ({
               sql: 'SQL',
               json: 'JSON',
               xml: 'XML',
-              markdown: 'Markdown'
+              markdown: 'Markdown',
+              bash: 'Bash',
+              shell: 'Shell'
             }
           }),
           
-          // Frontmatter
-          frontmatterPlugin(),
-          
-          // Directives (like admonitions)
-          directivesPlugin({
-            directiveDescriptors: [AdmonitionDirectiveDescriptor]
-          }),
-          
-          // Diff source (for viewing source vs rendered)
-          diffSourcePlugin({ viewMode: 'rich-text', diffMarkdown: '' }),
-          
-          // Toolbar with all features
           toolbarPlugin({
             toolbarContents: () => (
-              <div className="flex flex-wrap items-center gap-1 p-2 border-b">
-                {/* Kitchen sink - includes everything */}
-                <KitchenSinkToolbar />
-              </div>
+              <DiffSourceToggleWrapper>
+                <UndoRedo />
+                <BlockTypeSelect />
+                <BoldItalicUnderlineToggles />
+                <CreateLink />
+                <CodeToggle />
+                <InsertTable />
+                <InsertThematicBreak />
+                <InsertCodeBlock />
+                <ListsToggle />
+                </DiffSourceToggleWrapper>
             )
-          })
+          }),
+          diffSourcePlugin({ viewMode: 'rich-text', diffMarkdown: '' }),
+          listsPlugin(),
+          markdownShortcutPlugin(),
+          
+          
+          
         ]}
-        contentEditableClassName="prose max-w-none font-sans text-base p-4 focus:outline-none"
+        contentEditableClassName="prose max-w-none font-sans text-base dark:text-white dark:bg-gray-900 p-4 focus:outline-none"
       />
     </div>
   );
