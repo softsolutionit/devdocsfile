@@ -13,6 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Icons } from '@/components/icons';
 import { toast } from 'sonner';
+import { debouncePromise } from '@/utils/debounce';
+import { Loading } from '@/components/ui/loading';
+import { Spinner } from '@/components/ui/spinner';
 
 const formSchema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters'),
@@ -27,6 +30,8 @@ const formSchema = z.object({
 export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [checkLoading, setCheckLoading] = useState(false);
+  const [userNameAvailable, setUserNameAvailable] = useState(null);
   
   const {
     register,
@@ -51,7 +56,8 @@ export default function RegisterPage() {
   // Check username availability
   const checkUsername = async (username) => {
     if (!username || username.length < 3) return;
-    
+    setUserNameAvailable(null);
+    setCheckLoading(true);
     try {
       const response = await fetch(`/api/auth/check-username?username=${encodeURIComponent(username)}`);
       const data = await response.json();
@@ -59,23 +65,29 @@ export default function RegisterPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to check username');
       }
-      
       return data.available;
     } catch (error) {
       console.error('Error checking username:', error);
       return false;
+    } finally {
+      setCheckLoading(false);
     }
   };
+
+  const debouncedCheckUsername = debouncePromise(checkUsername, 500);
   
   // Debounced username validation
   const validateUsername = async (value) => {
+    setUserNameAvailable(null);
     if (!value) return 'Username is required';
+    if (value.length === 0) return 'Username is required';
     if (value.length < 3) return 'Username must be at least 3 characters';
     if (!/^[a-zA-Z0-9_]+$/.test(value)) {
       return 'Username can only contain letters, numbers, and underscores';
     }
     
-    const isAvailable = await checkUsername(value);
+    const isAvailable = await debouncedCheckUsername(value);
+    setUserNameAvailable(isAvailable);
     if (isAvailable === false) {
       return 'This username is already taken';
     }
@@ -147,7 +159,7 @@ export default function RegisterPage() {
               onClick={()=> handleOAuthRegister('google')}
             >
               <Icons.google className="mr-2 h-4 w-4" />
-              Google
+              Google 
             </Button>
           </div>
           <div className="relative">
@@ -181,6 +193,13 @@ export default function RegisterPage() {
                 </div>
                 <Input
                   id="username"
+                  {...register('username', {
+                    // validate: async (value) => await checkUsername(value),
+                    onChange: async (e) => {
+                      
+                      await validateUsername(e.target.value);
+                    }
+                  })}
                   className="pl-40"
                   placeholder="username"
                   type="text"
@@ -188,16 +207,27 @@ export default function RegisterPage() {
                   autoComplete="username"
                   autoCorrect="off"
                   disabled={isLoading}
-                  {...register('username', {
-                    validate: validateUsername,
-                  })}
+                  
+                  
                 />
               </div>
               {errors.username && (
                 <p className="text-sm text-red-500">{errors.username.message}</p>
               )}
-              {username && username.length >= 3 && !errors.username && (
+              {userNameAvailable === true && (
                 <p className="text-sm text-green-600">Username is available</p>
+              )}
+              {userNameAvailable === false && (
+                <p className="text-sm text-red-500">Username is already taken</p>
+              )}
+              {/* {userNameAvailable === null && (
+                <p className="text-sm text-gray-500">Type to check availability...</p>
+              )} */}
+              {checkLoading && (
+                <div className='flex gap-2'>
+                  <p className="text-sm text-gray-500">Checking availability...</p>
+                  <Spinner className="h-4 w-4" />
+                </div>
               )}
             </div>
             <div className="space-y-2">
